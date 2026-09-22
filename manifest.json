@@ -1,0 +1,19 @@
+{
+  "name": "ニューロサイエンスヨガ ─ 効いたポーズを持ち帰る",
+  "short_name": "ニューロヨガ",
+  "description": "ケン・ハラクマの簡単ストレッチヨガを、神経科学の視点で改変したポーズ集。1ポーズを「入り方 → 改変 → 狙い」の3つの音声ガイドで案内します。",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0a0f28",
+  "theme_color": "#0a0f28",
+  "scope": "./",
+  "lang": "ja",
+  "dir": "ltr",
+  "categories": ["health", "fitness", "lifestyle"],
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

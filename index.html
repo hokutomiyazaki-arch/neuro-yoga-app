@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ニューロサイエンスヨガ</title>
+<meta name="description" content="同じポーズでも、狙う神経の場所が変われば、効果が変わる。1ポーズを「入り方 → 改変 → 狙い」の3つの音声で案内します。">
+<meta name="theme-color" content="#0a0f28">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="ニューロヨガ">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png">
+<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@500;700;800&display=swap">
+<style>
+/* ─────────────────────────────────────────────────────────
+   土台（FNT PWA開発ナレッジ §5）
+   🔴 html,body に height:100% は書かない。min-height にする。
+      height だと中身がはみ出したときスクロールできなくなり、
+      画面下のボタンに永遠に届かなくなる（実機でしか踏まない）
+   ───────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; }
+html, body {
+  margin: 0; padding: 0;
+  width: 100%; max-width: 100%;
+  min-height: 100%;
+  overflow-x: hidden;
+}
+:root{
+  --bg:#0a0f28; --bg2:#121a3a; --card:#16204a;
+  --gold:#d8bd83; --gold2:#c9ae70;
+  --text:#f2f1ee; --muted:#a9adc4; --line:rgba(216,189,131,.22);
+  --ken:#7fc4d8; --hok:#d8bd83;
+}
+body{
+  background:var(--bg); color:var(--text);
+  font-family:"M PLUS Rounded 1c", -apple-system, BlinkMacSystemFont, "Hiragino Sans", sans-serif;
+  font-weight:700; line-height:1.7;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  -webkit-text-size-adjust:100%;
+}
+button{ font-family:inherit; font-weight:700; color:inherit; cursor:pointer; }
+img{ max-width:100%; display:block; }
+[hidden]{ display:none !important; }
+
+/* スクロールさせたい所は touch-action を必ず戻す（ナレッジ §3-1） */
+.scroll, .scroll *{ touch-action:auto !important; }
+.scroll{ -webkit-overflow-scrolling:touch; }
+
+/* ── 起動スプラッシュ（起動時だけ。再生のたびには出さない） ── */
+#splash{
+  position:fixed; inset:0; z-index:100;
+  background:#fff; color:#1a1e36;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  gap:14px; text-align:center; padding:24px;
+  transition:opacity .45s ease;
+}
+#splash img{ width:148px; height:148px; border-radius:30px; }
+#splash .fnt{ font-size:13px; letter-spacing:.14em; color:#6b7086; }
+#splash .name{ font-size:23px; font-weight:800; letter-spacing:.02em; }
+#splash .tag{ font-size:13px; color:#6b7086; }
+#splash .cr{ font-size:11px; color:#9a9db0; margin-top:10px; }
+#splash.off{ opacity:0; pointer-events:none; }
+
+/* ── ヘッダー ── */
+header{
+  position:sticky; top:0; z-index:30;
+  display:flex; align-items:center; gap:10px;
+  padding:10px 14px; background:rgba(10,15,40,.94);
+  backdrop-filter:blur(8px); border-bottom:1px solid var(--line);
+}
+header img{ width:30px; height:30px; border-radius:8px; }
+header .t{ font-size:15px; font-weight:800; flex:1; min-width:0; }
+.iconbtn{
+  width:42px; height:42px; flex:0 0 42px; border-radius:12px;
+  background:transparent; border:1px solid var(--line); color:var(--gold);
+  font-size:17px; display:flex; align-items:center; justify-content:center;
+}
+body.playing header{ display:none; }
+
+/* ── ホーム ── */
+main{ padding:16px 14px 40px; max-width:720px; margin:0 auto; }
+.lead{ font-size:15px; color:var(--text); margin:2px 0 6px; }
+.lead b{ color:var(--gold); }
+.sub{ font-size:13px; color:var(--muted); margin:0 0 18px; }
+
+.card{
+  display:flex; gap:12px; align-items:stretch; width:100%; text-align:left;
+  background:var(--card); border:1px solid var(--line); border-radius:16px;
+  padding:12px; margin-bottom:10px;
+}
+.card .thumb{
+  width:78px; height:78px; flex:0 0 78px; border-radius:12px;
+  background:var(--bg2); overflow:hidden; display:flex; align-items:center; justify-content:center;
+}
+.card .thumb img{ width:100%; height:100%; object-fit:cover; }
+.card .lock{ font-size:26px; opacity:.55; }
+.card .body{ flex:1; min-width:0; }
+.card .no{ font-size:12px; color:var(--gold); letter-spacing:.06em; }
+.card .mod{ font-size:14px; margin:1px 0 4px; }
+.card .tg{ font-size:12px; color:var(--muted); }
+.card .tg b{ color:var(--ken); font-weight:700; }
+.card[disabled]{ opacity:.72; }
+
+.sect{ font-size:13px; color:var(--muted); margin:26px 0 10px; letter-spacing:.04em; }
+
+/* ── ポーズ画面（全画面プレイ） ── */
+#pose{ position:fixed; inset:0; z-index:40; background:var(--bg); display:flex; flex-direction:column; }
+#pose .bar{
+  display:flex; align-items:center; gap:8px; padding:8px 12px;
+  padding-top:calc(8px + env(safe-area-inset-top));
+  border-bottom:1px solid var(--line); background:rgba(10,15,40,.96);
+}
+#pose .bar .t{ flex:1; min-width:0; font-size:14px; }
+#pose .bar .t small{ display:block; color:var(--gold); font-size:11px; }
+#pose .wrap{ flex:1; overflow-y:auto; padding:14px 14px calc(26px + env(safe-area-inset-bottom)); }
+
+/* 🔴 横スクロールにすると2枚目以降が画面の外に隠れて、在ることに気づけない
+   （実測：No.24 の「背面から」が見えなかった）。並べて全部見せる */
+.figs{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+.figs.one{ grid-template-columns:1fr; }
+.fig{ margin:0; min-width:0; }
+.fig img{ border-radius:14px; background:#fff; width:100%; }
+.fig figcaption{ font-size:11px; color:var(--muted); margin-top:5px; text-align:center; }
+
+.tracks{ margin:16px 0 0; display:flex; flex-direction:column; gap:8px; }
+.trk{
+  display:flex; align-items:center; gap:11px; width:100%; text-align:left;
+  background:var(--card); border:1px solid var(--line); border-radius:14px; padding:11px 12px;
+}
+.trk .n{
+  width:38px; height:38px; flex:0 0 38px; border-radius:50%;
+  display:flex; align-items:center; justify-content:center; font-size:15px;
+  background:var(--bg2); color:var(--gold); border:1px solid var(--line);
+}
+.trk .l{ flex:1; min-width:0; font-size:14px; }
+.trk .l small{ display:block; font-size:11px; color:var(--muted); font-weight:500; }
+.trk.on{ border-color:var(--gold); background:#1d2752; }
+.trk.on .n{ background:var(--gold); color:#11162e; }
+.trk .who-ken{ color:var(--ken); }
+.trk .who-hok{ color:var(--hok); }
+
+.ctl{ display:flex; gap:8px; margin-top:14px; }
+.ctl button{
+  flex:1; border-radius:14px; padding:13px 8px; font-size:14px;
+  border:1px solid var(--line); background:var(--card); color:var(--text);
+}
+.ctl button.primary{ background:var(--gold); color:#11162e; border-color:var(--gold); }
+.ctl button.quit{ color:var(--muted); }
+
+.seek{ margin-top:12px; }
+.seek input{ width:100%; accent-color:var(--gold); }
+.seek .tm{ display:flex; justify-content:space-between; font-size:11px; color:var(--muted); font-weight:500; }
+
+.script{
+  margin-top:14px; background:var(--bg2); border:1px solid var(--line);
+  border-radius:14px; padding:13px; font-size:14px; font-weight:500; line-height:1.9;
+}
+.script h4{ margin:0 0 6px; font-size:11px; color:var(--gold); letter-spacing:.06em; font-weight:700; }
+.meta{ margin-top:14px; font-size:13px; color:var(--muted); font-weight:500; }
+.meta b{ color:var(--text); font-weight:700; }
+
+/* ── サイドメニュー（モーダルにしない・ナレッジ §4） ── */
+#menu{
+  position:fixed; top:0; right:0; bottom:0; width:min(340px,88vw); z-index:60;
+  background:var(--bg2); border-left:1px solid var(--line);
+  transform:translateX(100%); transition:transform .25s ease;
+  overflow-y:auto; padding:16px 16px calc(40px + env(safe-area-inset-bottom));
+  padding-top:calc(16px + env(safe-area-inset-top));
+}
+#menu.open{ transform:translateX(0); }
+#scrim{ position:fixed; inset:0; z-index:55; background:rgba(0,0,0,.55); }
+#menu h3{ font-size:14px; margin:20px 0 8px; color:var(--gold); }
+#menu h3:first-of-type{ margin-top:8px; }
+#menu p, #menu li{ font-size:13px; font-weight:500; color:var(--text); line-height:1.85; }
+#menu ul{ padding-left:1.1em; margin:6px 0; }
+
+.field{ display:flex; gap:8px; margin-top:8px; }
+.field input{
+  flex:1; min-width:0; padding:11px 12px; border-radius:12px;
+  border:1px solid var(--line); background:var(--bg); color:var(--text);
+  font-family:inherit; font-size:15px; font-weight:700;
+}
+.field button{ padding:11px 15px; border-radius:12px; border:none; background:var(--gold); color:#11162e; }
+.msg{ font-size:12px; margin-top:8px; font-weight:700; }
+.msg.ok{ color:#8fd6a6; }
+.msg.ng{ color:#e8a0a0; }
+
+/* ── 警告バナー（ロックダウンモード等・ナレッジ §3-3） ── */
+#warn{
+  position:fixed; left:0; right:0; top:0; z-index:90;
+  background:#b4620f; color:#fff; font-size:12.5px; font-weight:700;
+  padding:calc(9px + env(safe-area-inset-top)) 14px 9px; text-align:center;
+}
+
+footer{
+  padding:26px 14px calc(26px + env(safe-area-inset-bottom));
+  text-align:center; font-size:11px; color:var(--muted); font-weight:500;
+  border-top:1px solid var(--line);
+}
+footer .fnt{ display:block; margin-top:4px; opacity:.75; }
+
+@media (prefers-reduced-motion: reduce){
+  *{ transition:none !important; animation:none !important; }
+}
+</style>
+</head>
+<body>
+
+<!-- 起動スプラッシュ：白背景ロゴ＋名前＋タグライン＋著作権（ナレッジ §4） -->
+<div id="splash">
+  <img src="icons/icon-512.png" alt="">
+  <div class="fnt">Neuroscience Yoga</div>
+  <div class="name">ニューロサイエンスヨガ</div>
+  <div class="tag">効いたポーズを、持ち帰る。</div>
+  <div class="cr">&copy; 2026 Le grand chariot</div>
+</div>
+
+<div id="warn" hidden></div>
+
+<header>
+  <img src="icons/icon-192.png" alt="">
+  <div class="t">ニューロサイエンスヨガ</div>
+  <button class="iconbtn" id="menuBtn" aria-label="メニューを開く">☰</button>
+</header>
+
+<main id="home">
+  <p class="lead">同じポーズでも、<b>狙う神経の場所が変われば、効果が変わる。</b></p>
+  <p class="sub">見た目はほとんど変わりません。変わるのは、どの神経に入力が届くか。<br>
+    1つのポーズを ① 入り方 → ② 改変 → ③ 狙い の3つの音声で案内します。
+    どれからでも、何度でも聞けます。</p>
+  <div id="list"></div>
+  <p class="sect" id="lockedHead" hidden>解除コードで開くポーズ</p>
+  <div id="lockedList"></div>
+</main>
+
+<footer>
+  &copy; 2026 Le grand chariot　ケン・ハラクマ × 宮崎ほくと
+  <span class="fnt">Functional Neuro Training</span>
+</footer>
+
+<!-- ポーズ画面 -->
+<section id="pose" hidden>
+  <div class="bar">
+    <button class="iconbtn" id="back" aria-label="一覧へ戻る">←</button>
+    <div class="t"><span id="pTitle"></span><small id="pTarget"></small></div>
+  </div>
+  <div class="wrap scroll">
+    <div class="figs" id="pFigs"></div>
+    <div class="tracks" id="pTracks"></div>
+
+    <div class="seek">
+      <input type="range" id="seek" min="0" max="1000" value="0" step="1" aria-label="再生位置">
+      <div class="tm"><span id="tCur">0:00</span><span id="tDur">0:00</span></div>
+    </div>
+
+    <div class="ctl">
+      <button class="primary" id="playAll">通しで再生</button>
+      <button id="pause">一時停止</button>
+      <button class="quit" id="quit">やめる</button>
+    </div>
+
+    <div class="script"><h4 id="sHead">台本</h4><div id="sBody"></div></div>
+    <div class="meta" id="pMeta"></div>
+  </div>
+</section>
+
+<div id="scrim" hidden></div>
+<aside id="menu" class="scroll">
+  <h3>使い方</h3>
+  <p>ポーズを選んで、<b>① 入り方</b>から順に聞きます。<br>
+    もう覚えている日は ① を飛ばして <b>② 改変</b>だけ、
+    体感を確かめたい日は <b>③ 狙い</b>だけ、という聞き方ができます。</p>
+  <p>①はケン・ハラクマ、②③は宮崎ほくとの声です。</p>
+
+  <h3>なぜ効くのか</h3>
+  <p>ヨガのポーズは、解剖学ではずいぶん語られてきました。神経科学からは、まだです。</p>
+  <p>このアプリの「改変」は、いつものポーズに
+    <b>眼の動き・頭の向き・呼吸のタイミング</b>を少し足すだけのものです。
+    見た目はほとんど変わりません。変わるのは、どの神経に入力が届くかです。</p>
+  <ul>
+    <li>眼を上下左右に動かす → 小脳 虫部</li>
+    <li>肩甲骨を上げ下げする → 副神経・延髄</li>
+    <li>首を回して見る先を変える → 卵形嚢</li>
+    <li>見る方向へ回旋する → 動眼神経・外転神経</li>
+  </ul>
+  <p>どのポーズが効くかは人によって違います。全部やってみて、
+    <b>自分に効いた3つ</b>を見つけて持ち帰るのが、このアプリの使い方です。</p>
+
+  <h3>解除コード</h3>
+  <p id="unlockState">いまは3ポーズが開いています。コースでお渡しするコードを入れると、23ポーズすべてが開きます。</p>
+  <div class="field">
+    <input id="code" type="text" inputmode="latin" autocapitalize="characters"
+           autocomplete="off" placeholder="コードを入力">
+    <button id="apply">開く</button>
+  </div>
+  <div class="msg" id="codeMsg"></div>
+
+  <h3>ホーム画面に置く</h3>
+  <p>iPhone は Safari の共有ボタン <b>［  ］</b> →「ホーム画面に追加」。<br>
+    Android は Chrome の <b>［⋮］</b> →「アプリをインストール」。<br>
+    置いておくと、次からアプリとして開けます。<b>一度開いたポーズは、電波が無くても聞けます。</b></p>
+
+  <h3>このアプリについて</h3>
+  <p>ケン・ハラクマの「簡単ストレッチヨガ」を、神経科学の視点で改変したポーズ集です。
+    ケン・ハラクマ × 宮崎ほくと の共同事業「ニューロサイエンスヨガ」の一部です。</p>
+  <p style="color:var(--muted);font-size:11.5px">
+    &copy; 2026 Le grand chariot<br>Functional Neuro Training
+  </p>
+</aside>
+
+<script src="data.js"></script>
+<script>
+/* =========================================================================
+   ニューロサイエンスヨガ PWA
+   FNT PWA開発ナレッジ準拠。とくに効いている項目：
+     §2   Network First ＋ controllerchange で自動リロード
+     §3-1 スクロールさせたい所に touch-action:auto
+     §3-3 音が使えなくても止まらない（try-catch ＋ 警告バナー）
+     §3-5b html,body は min-height
+     §3-6 🔴 **Audio要素は1つだけ作って使い回す**
+          毎回 new Audio() すると、ユーザー操作の外（曲の終わりなど）で鳴らす
+          2本目以降が iOS に全部ブロックされる。このアプリは
+          ①→②→③ を自動で繋ぐので、ここを外すと2本目から無音になる
+     §3-4 状態は window に載せる（iOS Safari がローカル変数を捨てることがある）
+   ========================================================================= */
+'use strict';
+
+var D = window.NY_DATA;
+window.NY = window.NY || { poses: [], cur: null, track: -1, chain: false, unlocked: false };
+
+/* ---------- 小さい道具 ---------- */
+function $(id){ return document.getElementById(id); }
+function mmss(s){
+  if(!isFinite(s)) return '0:00';
+  s = Math.max(0, Math.round(s));
+  return Math.floor(s/60) + ':' + String(s%60).padStart(2,'0');
+}
+function warn(msg){
+  var w = $('warn'); w.textContent = msg; w.hidden = false;
+  setTimeout(function(){ w.hidden = true; }, 7000);
+}
+function store(k, v){
+  try{ if(v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); }
+  catch(e){ /* プライベートウィンドウ等。無くても動く */ }
+}
+
+/* ---------- 解除（PBKDF2 → SHA-256 のカウンタでキーストリーム） ----------
+   🔴 公開リポジトリなので、画面で隠すだけでは意味がない。
+      鍵つきポーズの「ファイル名と台本」は data.js の中で封じてある。
+      コードを入れて初めて、どのファイルを読めばいいかが分かる。
+   🔴 crypto.subtle は https でしか動かない（GitHub Pages はhttps）。
+      手元で確かめるときは file:// ではなくローカルサーバーで開く。          */
+async function sha256hex(bytes){
+  var d = await crypto.subtle.digest('SHA-256', bytes);
+  return Array.from(new Uint8Array(d)).map(function(b){
+    return b.toString(16).padStart(2,'0'); }).join('');
+}
+async function keystream(key, n){
+  var out = new Uint8Array(Math.ceil(n/32)*32);
+  for(var i=0; i*32 < n; i++){
+    var buf = new Uint8Array(key.length + 4);
+    buf.set(key, 0);
+    new DataView(buf.buffer).setUint32(key.length, i, false);
+    out.set(new Uint8Array(await crypto.subtle.digest('SHA-256', buf)), i*32);
+  }
+  return out.subarray(0, n);
+}
+async function openSealed(code){
+  var enc = new TextEncoder();
+  if((await sha256hex(enc.encode(code))).slice(0,16) !== D.codeHash) return null;
+  var km = await crypto.subtle.importKey('raw', enc.encode(code), 'PBKDF2', false, ['deriveBits']);
+  var bits = await crypto.subtle.deriveBits(
+    { name:'PBKDF2', salt: enc.encode(D.salt), iterations: D.iter, hash:'SHA-256' }, km, 256);
+  var key = new Uint8Array(bits);
+  var bin = atob(D.sealed);
+  var ct = new Uint8Array(bin.length);
+  for(var i=0;i<bin.length;i++) ct[i] = bin.charCodeAt(i);
+  var ks = await keystream(key, ct.length);
+  var raw = new Uint8Array(ct.length);
+  for(var j=0;j<ct.length;j++) raw[j] = ct[j] ^ ks[j];
+  try{ return JSON.parse(new TextDecoder().decode(raw)); }catch(e){ return null; }
+}
+
+/* ---------- 音（Audio要素は1つだけ・ナレッジ §3-6） ---------- */
+window.NY.audio = null;
+function aud(){
+  if(window.NY.audio) return window.NY.audio;
+  var a;
+  try{ a = new Audio(); }
+  catch(e){ warn('この端末では音声を再生できません。台本の文字でご案内します。'); return null; }
+  a.preload = 'auto';
+  a.addEventListener('timeupdate', paint);
+  a.addEventListener('loadedmetadata', paint);
+  a.addEventListener('ended', onEnded);
+  a.addEventListener('error', function(){
+    warn('音声を読み込めませんでした。通信を確かめて、もう一度押してください。');
+  });
+  window.NY.audio = a;
+  return a;
+}
+
+/* ---------- 画面の描画 ---------- */
+function card(p, locked){
+  var b = document.createElement('button');
+  b.className = 'card';
+  var thumb = locked
+    ? '<div class="thumb"><span class="lock">🔒</span></div>'
+    : '<div class="thumb"><img src="assets/img/' + p.img[0].f + '" alt="" loading="lazy"></div>';
+  b.innerHTML = thumb +
+    '<div class="body"><div class="no">No.' + p.no + '　' + p.cat + '</div>' +
+    '<div class="mod">' + (locked ? 'コードで開きます' : p.mod) + '</div>' +
+    '<div class="tg">狙う神経　<b>' + p.target + '</b></div></div>';
+  b.addEventListener('click', function(){
+    if(locked){ openMenu(); $('code').focus(); return; }
+    openPose(p);
+  });
+  return b;
+}
+function render(){
+  var open = window.NY.poses;
+  var list = $('list'); list.innerHTML = '';
+  open.forEach(function(p){ list.appendChild(card(p, false)); });
+
+  var lk = $('lockedList'); lk.innerHTML = '';
+  var head = $('lockedHead');
+  if(window.NY.unlocked){ head.hidden = true; return; }
+  head.hidden = false;
+  (D.locked || []).forEach(function(t){ lk.appendChild(card(t, true)); });
+}
+
+/* ---------- ポーズ画面 ---------- */
+function openPose(p){
+  window.NY.cur = p; window.NY.track = -1; window.NY.chain = false;
+  $('pTitle').textContent = 'No.' + p.no + '　' + p.mod;
+  $('pTarget').textContent = '狙う神経　' + p.target;
+
+  var figs = $('pFigs');
+  figs.className = 'figs' + (p.img.length === 1 ? ' one' : '');
+  figs.innerHTML = p.img.map(function(i){
+    return '<figure class="fig"><img src="assets/img/' + i.f + '" alt="">' +
+           (i.cap ? '<figcaption>' + i.cap + '</figcaption>' : '') + '</figure>';
+  }).join('');
+
+  $('pTracks').innerHTML = p.tracks.map(function(t, i){
+    var cls = t.who.indexOf('ケン') === 0 ? 'who-ken' : 'who-hok';
+    return '<button class="trk" data-i="' + i + '"><span class="n">' + (i+1) + '</span>' +
+           '<span class="l">' + t.label.replace(/^[①②③]\s*/, '') +
+           '<small class="' + cls + '">' + t.who + '</small></span>' +
+           '<span style="color:var(--gold)">▶</span></button>';
+  }).join('');
+  Array.prototype.forEach.call($('pTracks').children, function(b){
+    b.addEventListener('click', function(){ play(+b.dataset.i, false); });
+  });
+
+  $('pMeta').innerHTML = '<b>元のポーズ</b>　' + p.base + '<br><b>ねらい</b>　' + p.effect;
+  $('sHead').textContent = '台本';
+  $('sBody').textContent = '再生すると、読み上げている文がここに出ます。';
+
+  $('pose').hidden = false;
+  document.body.classList.add('playing');
+  goFull();
+  $('pose').querySelector('.wrap').scrollTop = 0;
+}
+function closePose(){
+  stop();
+  $('pose').hidden = true;
+  document.body.classList.remove('playing');
+  exitFull();
+}
+
+/* ---------- 再生 ---------- */
+function play(i, chain){
+  var p = window.NY.cur; if(!p || !p.tracks[i]) return;
+  var a = aud(); if(!a) return;
+  window.NY.track = i;
+  window.NY.chain = !!chain;
+  try{ a.pause(); }catch(e){}
+  a.src = 'assets/audio/' + p.tracks[i].f;
+  a.currentTime = 0;
+  var pr = a.play();
+  if(pr && pr.catch) pr.catch(function(){
+    warn('音声が始まりませんでした。もう一度ボタンを押してください。');
+  });
+  wake(true);
+  markTracks();
+  $('sHead').textContent = p.tracks[i].label + '　' + p.tracks[i].who;
+  $('sBody').textContent = p.tracks[i].text;
+  $('pause').textContent = '一時停止';
+}
+function onEnded(){
+  // 🔴 ここは「ユーザー操作の外」。だから同じ Audio 要素で src を差し替える（§3-6）
+  var p = window.NY.cur;
+  if(window.NY.chain && p && window.NY.track + 1 < p.tracks.length){
+    play(window.NY.track + 1, true);
+    return;
+  }
+  window.NY.chain = false;
+  wake(false);
+  markTracks();
+}
+function stop(){
+  var a = window.NY.audio;
+  if(a){ try{ a.pause(); a.currentTime = 0; }catch(e){} }
+  window.NY.track = -1; window.NY.chain = false;
+  wake(false);
+  markTracks(); paint();
+  $('pause').textContent = '一時停止';
+}
+function markTracks(){
+  Array.prototype.forEach.call($('pTracks').children, function(b){
+    b.classList.toggle('on', +b.dataset.i === window.NY.track);
+  });
+}
+function paint(){
+  var a = window.NY.audio;
+  var cur = a ? a.currentTime : 0, dur = (a && isFinite(a.duration)) ? a.duration : 0;
+  $('tCur').textContent = mmss(cur);
+  $('tDur').textContent = mmss(dur);
+  if(!window.NY.seeking) $('seek').value = dur ? Math.round(cur / dur * 1000) : 0;
+}
+
+/* ---------- 画面を起こしておく／全画面 ---------- */
+window.NY.lock = null;
+function wake(on){
+  try{
+    if(on){
+      if(!navigator.wakeLock || window.NY.lock) return;
+      navigator.wakeLock.request('screen').then(function(l){ window.NY.lock = l; }).catch(function(){});
+    }else if(window.NY.lock){
+      window.NY.lock.release().catch(function(){});
+      window.NY.lock = null;
+    }
+  }catch(e){}
+}
+function goFull(){
+  try{
+    var el = document.documentElement;
+    if(el.requestFullscreen && !document.fullscreenElement) el.requestFullscreen().catch(function(){});
+  }catch(e){}
+}
+function exitFull(){
+  try{ if(document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(function(){}); }
+  catch(e){}
+}
+
+/* ---------- 操作 ---------- */
+function openMenu(){ $('menu').classList.add('open'); $('scrim').hidden = false; }
+function closeMenu(){ $('menu').classList.remove('open'); $('scrim').hidden = true; }
+
+$('menuBtn').addEventListener('click', openMenu);
+$('scrim').addEventListener('click', closeMenu);
+$('back').addEventListener('click', closePose);
+$('quit').addEventListener('click', closePose);
+
+$('playAll').addEventListener('click', function(){ play(0, true); });
+$('pause').addEventListener('click', function(){
+  var a = window.NY.audio; if(!a || window.NY.track < 0) return;
+  if(a.paused){ a.play().catch(function(){}); wake(true); this.textContent = '一時停止'; }
+  else { a.pause(); wake(false); this.textContent = '再開'; }
+});
+$('seek').addEventListener('input', function(){ window.NY.seeking = true; });
+$('seek').addEventListener('change', function(){
+  var a = window.NY.audio;
+  if(a && isFinite(a.duration)) a.currentTime = a.duration * (this.value / 1000);
+  window.NY.seeking = false;
+});
+
+$('apply').addEventListener('click', applyCode);
+$('code').addEventListener('keydown', function(e){ if(e.key === 'Enter') applyCode(); });
+
+async function applyCode(){
+  var msg = $('codeMsg');
+  var code = ($('code').value || '').trim().toUpperCase();
+  if(!code){ msg.className = 'msg ng'; msg.textContent = 'コードを入れてください。'; return; }
+  if(!window.crypto || !crypto.subtle){
+    msg.className = 'msg ng';
+    msg.textContent = 'この開き方ではコードを確認できません。アプリのURL（https）から開いてください。';
+    return;
+  }
+  msg.className = 'msg'; msg.textContent = '確かめています…';
+  var got = null;
+  try{ got = await openSealed(code); }catch(e){ got = null; }
+  if(!got){ msg.className = 'msg ng'; msg.textContent = 'このコードでは開きませんでした。'; return; }
+  store('ny_code', code);
+  applyUnlocked(got);
+  msg.className = 'msg ok'; msg.textContent = '23ポーズすべてが開きました。';
+}
+function applyUnlocked(locked){
+  window.NY.unlocked = true;
+  window.NY.poses = D.poses.concat(locked).sort(function(a,b){ return a.no - b.no; });
+  $('unlockState').textContent = '23ポーズすべてが開いています。';
+  render();
+}
+
+/* ---------- 起動 ---------- */
+(function boot(){
+  window.NY.poses = (D.poses || []).slice();
+  render();
+
+  // 前に入れたコードがあれば、黙って開き直す
+  var saved = store('ny_code');
+  if(saved && window.crypto && crypto.subtle){
+    openSealed(saved).then(function(got){ if(got) applyUnlocked(got); }).catch(function(){});
+  }
+
+  // スプラッシュは起動時だけ
+  setTimeout(function(){
+    var s = $('splash'); s.classList.add('off');
+    setTimeout(function(){ s.hidden = true; }, 500);
+  }, 1400);
+
+  // 🔴 一番背が伸びる状態でも下まで届くか、自分で測って知らせる（ナレッジ §3-5b）
+  setTimeout(function(){
+    var de = document.documentElement;
+    var ok = de.scrollHeight <= innerHeight || de.scrollHeight > de.clientHeight;
+    if(!ok) warn('表示がおかしいようです。アプリを開き直してください。');
+  }, 2200);
+})();
+
+/* Service Worker：更新されたら自動でリロード（ナレッジ §2） */
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('./sw.js').catch(function(){});
+  var refreshing = false;
+  navigator.serviceWorker.addEventListener('controllerchange', function(){
+    if(refreshing) return;
+    refreshing = true;
+    location.reload();
+  });
+}
+</script>
+</body>
+</html>
