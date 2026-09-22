@@ -109,6 +109,28 @@ main{ padding:16px 14px 40px; max-width:720px; margin:0 auto; }
 
 .sect{ font-size:13px; color:var(--muted); margin:26px 0 10px; letter-spacing:.04em; }
 
+.flowbar{ margin:0 0 16px; }
+.flowbar .primary{
+  width:100%; border:none; border-radius:14px; padding:14px 10px;
+  background:var(--gold); color:#11162e; font-size:15px;
+}
+.flowbar .primary small{ display:block; font-size:11.5px; font-weight:500; opacity:.8; }
+.flowbar .opt{
+  display:flex; align-items:center; gap:8px; justify-content:center;
+  margin-top:9px; font-size:12.5px; font-weight:500; color:var(--muted);
+}
+.flowbar .opt input{ accent-color:var(--gold); width:17px; height:17px; }
+
+.flowrow{
+  display:flex; align-items:center; gap:8px; margin:0 0 12px;
+  background:var(--bg2); border:1px solid var(--line); border-radius:12px; padding:7px 9px;
+}
+.flowrow span{ flex:1; text-align:center; font-size:12.5px; color:var(--gold); }
+.flowrow button{
+  border:1px solid var(--line); background:transparent; color:var(--text);
+  border-radius:10px; padding:7px 11px; font-size:12.5px;
+}
+
 /* ── ポーズ画面（全画面プレイ） ── */
 #pose{ position:fixed; inset:0; z-index:40; background:var(--bg); display:flex; flex-direction:column; }
 #pose .bar{
@@ -234,6 +256,10 @@ footer .fnt{ display:block; margin-top:4px; opacity:.75; }
   <p class="sub">見た目はほとんど変わりません。変わるのは、どの神経に入力が届くか。<br>
     1つのポーズを ① 入り方 → ② 改変 → ③ 狙い の3つの音声で案内します。
     どれからでも、何度でも聞けます。</p>
+  <div class="flowbar">
+    <button id="flowStart" class="primary">通しでやる<small id="flowLen"></small></button>
+    <label class="opt"><input type="checkbox" id="optWhy" checked> ③ 狙いの解説も流す</label>
+  </div>
   <div id="list"></div>
   <p class="sect" id="lockedHead" hidden>解除コードで開くポーズ</p>
   <div id="lockedList"></div>
@@ -251,6 +277,11 @@ footer .fnt{ display:block; margin-top:4px; opacity:.75; }
     <div class="t"><span id="pTitle"></span><small id="pTarget"></small></div>
   </div>
   <div class="wrap scroll">
+    <div class="flowrow" id="flowRow" hidden>
+      <button id="fPrev">← 前</button>
+      <span id="fPos"></span>
+      <button id="fNext">次 →</button>
+    </div>
     <div class="figs" id="pFigs"></div>
     <div class="tracks" id="pTracks"></div>
 
@@ -332,7 +363,8 @@ footer .fnt{ display:block; margin-top:4px; opacity:.75; }
 'use strict';
 
 var D = window.NY_DATA;
-window.NY = window.NY || { poses: [], cur: null, track: -1, chain: false, unlocked: false };
+window.NY = window.NY || { poses: [], cur: null, track: -1, chain: false,
+                           unlocked: false, flow: false, fi: -1, why: true };
 
 /* ---------- 小さい道具 ---------- */
 function $(id){ return document.getElementById(id); }
@@ -435,8 +467,23 @@ function card(p, locked){
   });
   return b;
 }
+function totalSec(list, withWhy){
+  var t = 0;
+  list.forEach(function(p){
+    p.tracks.forEach(function(tr, i){ if(withWhy || i < 2) t += (tr.sec || 0); });
+  });
+  return t;
+}
+function paintFlowLen(){
+  var n = window.NY.poses.length;
+  var sec = totalSec(window.NY.poses, $('optWhy').checked);
+  var m = Math.round(sec / 60);
+  $('flowLen').textContent = n + 'ポーズを順に、音声で約' + m + '分（間は入っています）';
+}
+
 function render(){
   var open = window.NY.poses;
+  paintFlowLen();
   var list = $('list'); list.innerHTML = '';
   open.forEach(function(p){ list.appendChild(card(p, false)); });
 
@@ -448,7 +495,8 @@ function render(){
 }
 
 /* ---------- ポーズ画面 ---------- */
-function openPose(p){
+function openPose(p, keepFlow){
+  if(!keepFlow && !window.NY.flow) window.NY.fi = -1;
   window.NY.cur = p; window.NY.track = -1; window.NY.chain = false;
   $('pTitle').textContent = 'No.' + p.no + '　' + p.mod;
   $('pTarget').textContent = '狙う神経　' + p.target;
@@ -475,13 +523,15 @@ function openPose(p){
   $('sHead').textContent = '台本';
   $('sBody').textContent = '再生すると、読み上げている文がここに出ます。';
 
+  paintFlow();
   $('pose').hidden = false;
   document.body.classList.add('playing');
   goFull();
   $('pose').querySelector('.wrap').scrollTop = 0;
 }
 function closePose(){
-  stop();
+  window.NY.flow = false; window.NY.fi = -1;
+  stop(); paintFlow();
   $('pose').hidden = true;
   document.body.classList.remove('playing');
   exitFull();
@@ -508,14 +558,59 @@ function play(i, chain){
 }
 function onEnded(){
   // 🔴 ここは「ユーザー操作の外」。だから同じ Audio 要素で src を差し替える（§3-6）
+  //    new Audio() で作り直すと、iOS では2本目以降が全部ブロックされる
   var p = window.NY.cur;
-  if(window.NY.chain && p && window.NY.track + 1 < p.tracks.length){
+  var last = window.NY.why ? p.tracks.length - 1 : 1;   // ③を流さない設定なら②（改変）で終わり
+  if(window.NY.chain && p && window.NY.track < last){
     play(window.NY.track + 1, true);
     return;
   }
+  // 🔴 流れを進めるのは「通しで再生していたとき」だけ。
+  //    途中で1つの音声だけを押した人まで次のポーズへ送ってしまわないように
+  var wasChain = window.NY.chain;
   window.NY.chain = false;
+  if(window.NY.flow && wasChain){ nextPose(2200); return; }
   wake(false);
   markTracks();
+}
+
+/* ---------- 流れ（ポーズをまたいで通す） ---------- */
+function flowStart(){
+  var list = window.NY.poses;
+  if(!list.length) return;
+  window.NY.flow = true;
+  window.NY.why = $('optWhy').checked;
+  window.NY.fi = 0;
+  openPose(list[0]);
+  play(0, true);        // ★ ここがユーザー操作の中。以後は同じ要素を使い回す
+}
+function nextPose(waitMs){
+  var list = window.NY.poses;
+  if(window.NY.fi + 1 >= list.length){          // 最後まで行った
+    window.NY.flow = false; window.NY.chain = false;
+    wake(false); markTracks(); paintFlow();
+    $('sHead').textContent = '通し終わり';
+    $('sBody').textContent = 'おつかれさまでした。いちばん変化を感じたポーズを3つ、覚えて帰ってください。';
+    return;
+  }
+  window.NY.fi += 1;
+  var go = function(){
+    if(!window.NY.flow) return;      // 待っているあいだに「やめる」を押されていたら進めない
+    openPose(list[window.NY.fi]);
+    play(0, true);
+  };
+  if(waitMs) setTimeout(go, waitMs); else go();
+}
+function prevPose(){
+  if(window.NY.fi <= 0) return;
+  window.NY.fi -= 1;
+  openPose(window.NY.poses[window.NY.fi]);
+  play(0, true);
+}
+function paintFlow(){
+  var on = window.NY.flow;
+  $('flowRow').hidden = !on;
+  if(on) $('fPos').textContent = (window.NY.fi + 1) + ' / ' + window.NY.poses.length + ' ポーズ';
 }
 function stop(){
   var a = window.NY.audio;
@@ -571,7 +666,7 @@ $('scrim').addEventListener('click', closeMenu);
 $('back').addEventListener('click', closePose);
 $('quit').addEventListener('click', closePose);
 
-$('playAll').addEventListener('click', function(){ play(0, true); });
+$('playAll').addEventListener('click', function(){ window.NY.why = true; play(0, true); });
 $('pause').addEventListener('click', function(){
   var a = window.NY.audio; if(!a || window.NY.track < 0) return;
   if(a.paused){ a.play().catch(function(){}); wake(true); this.textContent = '一時停止'; }
@@ -584,8 +679,12 @@ $('seek').addEventListener('change', function(){
   window.NY.seeking = false;
 });
 
+$('flowStart').addEventListener('click', flowStart);
+$('fNext').addEventListener('click', function(){ nextPose(0); });
+$('fPrev').addEventListener('click', prevPose);
 $('apply').addEventListener('click', applyCode);
 $('code').addEventListener('keydown', function(e){ if(e.key === 'Enter') applyCode(); });
+$('optWhy').addEventListener('change', paintFlowLen);
 
 async function applyCode(){
   var msg = $('codeMsg');
