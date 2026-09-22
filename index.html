@@ -202,6 +202,11 @@ main{ padding:16px 14px 40px; max-width:720px; margin:0 auto; }
 #menu p, #menu li{ font-size:13px; font-weight:500; color:var(--text); line-height:1.85; }
 #menu ul{ padding-left:1.1em; margin:6px 0; }
 
+.opt2{ display:flex; align-items:center; gap:9px; font-size:13.5px; margin:10px 0 6px; }
+.opt2 input{ accent-color:var(--gold); width:19px; height:19px; }
+.vol{ display:flex; align-items:center; gap:9px; font-size:11px; color:var(--muted); }
+.vol input{ flex:1; accent-color:var(--gold); }
+
 .field{ display:flex; gap:8px; margin-top:8px; }
 .field input{
   flex:1; min-width:0; padding:11px 12px; border-radius:12px;
@@ -332,6 +337,15 @@ footer .fnt{ display:block; margin-top:4px; opacity:.75; }
   </div>
   <div class="msg" id="codeMsg"></div>
 
+  <h3>BGM</h3>
+  <p>ヨガの定番のドローン（主音と5度だけを重ねた音）を用意しました。
+    明るい/暗いの色が付かないので、どのポーズにも当たりません。</p>
+  <label class="opt2"><input type="checkbox" id="bgmOn"> BGMを流す</label>
+  <div class="vol"><span>小</span>
+    <input type="range" id="bgmVol" min="0" max="100" value="35" aria-label="BGMの音量">
+    <span>大</span></div>
+  <p id="bgmMsg" class="msg"></p>
+
   <h3>ホーム画面に置く</h3>
   <p>iPhone は Safari の共有ボタン <b>［  ］</b> →「ホーム画面に追加」。<br>
     Android は Chrome の <b>［⋮］</b> →「アプリをインストール」。<br>
@@ -450,6 +464,62 @@ function aud(){
   return a;
 }
 
+
+/* ---------- BGM（Web Audio） ----------
+   🔴 なぜ <audio> ではなく Web Audio か（2026-09-22）
+     ・iOS Safari は `<audio>` の `volume` を**黙って無視する**。音量も、
+       ナレーション中に下げる処理も効かない。GainNode なら効く
+     ・ループの継ぎ目を自分で決められる（mp3は末尾に余白が付くので、
+       素材側も両端を絞ってある）
+   🔴 AudioContext が使えない端末がある（ロックダウンモード等・ナレッジ §3-3）。
+      そのときは **BGMだけ諦めて、音声ガイドは止めない**。         */
+window.NY.bgm = { ctx:null, buf:null, src:null, gain:null, on:false, vol:0.35, loading:false };
+
+function bgmSetGain(){
+  var b = window.NY.bgm;
+  if(!b.gain || !b.ctx) return;
+  // ナレーション中は下げる（声が聞こえなくなったら意味がない）
+  var duck = (window.NY.track >= 0 && window.NY.audio && !window.NY.audio.paused) ? 0.35 : 1;
+  b.gain.gain.setTargetAtTime(b.vol * duck, b.ctx.currentTime, 0.4);
+}
+
+async function bgmStart(){
+  var b = window.NY.bgm;
+  if(!b.on || b.src || b.loading) return;
+  b.loading = true;
+  try{
+    if(!b.ctx){
+      var AC = window.AudioContext || window.webkitAudioContext;
+      if(!AC) throw new Error('no AudioContext');
+      b.ctx = new AC();
+      b.gain = b.ctx.createGain();
+      b.gain.gain.value = 0;
+      b.gain.connect(b.ctx.destination);
+    }
+    if(b.ctx.state === 'suspended') await b.ctx.resume();   // 触った瞬間に起こす
+    if(!b.buf){
+      var res = await fetch('assets/bgm.mp3');
+      b.buf = await b.ctx.decodeAudioData(await res.arrayBuffer());
+    }
+    var src = b.ctx.createBufferSource();
+    src.buffer = b.buf; src.loop = true;
+    src.connect(b.gain); src.start(0);
+    b.src = src;
+    bgmSetGain();
+    $('bgmMsg').textContent = '';
+  }catch(e){
+    b.on = false;
+    $('bgmOn').checked = false;
+    $('bgmMsg').className = 'msg ng';
+    $('bgmMsg').textContent = 'この端末ではBGMを鳴らせませんでした（音声ガイドはそのまま使えます）。';
+  }
+  b.loading = false;
+}
+function bgmStop(){
+  var b = window.NY.bgm;
+  if(b.src){ try{ b.src.stop(); }catch(e){} try{ b.src.disconnect(); }catch(e){} b.src = null; }
+}
+
 /* ---------- 画面の描画 ---------- */
 function card(p, locked){
   var b = document.createElement('button');
@@ -531,7 +601,7 @@ function openPose(p, keepFlow){
 }
 function closePose(){
   window.NY.flow = false; window.NY.fi = -1;
-  stop(); paintFlow();
+  stop(); paintFlow(); bgmStop();
   $('pose').hidden = true;
   document.body.classList.remove('playing');
   exitFull();
@@ -552,6 +622,7 @@ function play(i, chain){
   });
   wake(true);
   markTracks();
+  bgmStart(); bgmSetGain();
   $('sHead').textContent = p.tracks[i].label + '　' + p.tracks[i].who;
   $('sBody').textContent = p.tracks[i].text;
   $('pause').textContent = '一時停止';
@@ -572,6 +643,7 @@ function onEnded(){
   if(window.NY.flow && wasChain){ nextPose(2200); return; }
   wake(false);
   markTracks();
+  bgmSetGain();
 }
 
 /* ---------- 流れ（ポーズをまたいで通す） ---------- */
@@ -617,7 +689,7 @@ function stop(){
   if(a){ try{ a.pause(); a.currentTime = 0; }catch(e){} }
   window.NY.track = -1; window.NY.chain = false;
   wake(false);
-  markTracks(); paint();
+  markTracks(); paint(); bgmSetGain();
   $('pause').textContent = '一時停止';
 }
 function markTracks(){
@@ -671,6 +743,7 @@ $('pause').addEventListener('click', function(){
   var a = window.NY.audio; if(!a || window.NY.track < 0) return;
   if(a.paused){ a.play().catch(function(){}); wake(true); this.textContent = '一時停止'; }
   else { a.pause(); wake(false); this.textContent = '再開'; }
+  setTimeout(bgmSetGain, 50);
 });
 $('seek').addEventListener('input', function(){ window.NY.seeking = true; });
 $('seek').addEventListener('change', function(){
@@ -685,6 +758,16 @@ $('fPrev').addEventListener('click', prevPose);
 $('apply').addEventListener('click', applyCode);
 $('code').addEventListener('keydown', function(e){ if(e.key === 'Enter') applyCode(); });
 $('optWhy').addEventListener('change', paintFlowLen);
+$('bgmOn').addEventListener('change', function(){
+  window.NY.bgm.on = this.checked;
+  store('ny_bgm', this.checked ? '1' : '0');
+  if(this.checked) bgmStart(); else bgmStop();
+});
+$('bgmVol').addEventListener('input', function(){
+  window.NY.bgm.vol = this.value / 100;
+  store('ny_bgmvol', this.value);
+  bgmSetGain();
+});
 
 async function applyCode(){
   var msg = $('codeMsg');
@@ -715,6 +798,10 @@ function applyUnlocked(locked){
 (function boot(){
   window.NY.poses = (D.poses || []).slice();
   render();
+
+  var bv = store('ny_bgmvol');
+  if(bv){ $('bgmVol').value = bv; window.NY.bgm.vol = bv / 100; }
+  if(store('ny_bgm') === '1'){ $('bgmOn').checked = true; window.NY.bgm.on = true; }
 
   // 前に入れたコードがあれば、黙って開き直す
   var saved = store('ny_code');
