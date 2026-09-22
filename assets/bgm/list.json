@@ -1,0 +1,26 @@
+[
+ {
+  "id": "drone",
+  "label": "ドローン（軽い）",
+  "f": "../bgm.mp3",
+  "sec": 60.9
+ },
+ {
+  "id": "breath",
+  "label": "寂静呼吸",
+  "f": "breath.m4a",
+  "sec": 234.1
+ },
+ {
+  "id": "bed",
+  "label": "Meditative Bed",
+  "f": "bed.m4a",
+  "sec": 300.0
+ },
+ {
+  "id": "dorian",
+  "label": "Stillness in Dorian",
+  "f": "dorian.m4a",
+  "sec": 189.7
+ }
+]

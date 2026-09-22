@@ -8,13 +8,14 @@
 //    23ポーズぶんの音声は 16MB あり、install で全部取ると初回が重く、失敗すると
 //    SW ごと入らない。**無料の3ポーズ（約2MB）だけ先に取り、残りは再生したときに
 //    キャッシュへ落とす**（runtime cache）。2回目からはオフラインで聴ける。
-const CACHE_NAME = 'neuro-yoga-v1.0.2';   // ★デプロイのたびにここを上げる★
+const CACHE_NAME = 'neuro-yoga-v1.0.3';   // ★デプロイのたびにここを上げる★
 
 const SHELL = [
   './',
   './index.html',
   './manifest.json',
   './data.js',
+  './assets/bgm/list.json',
   './icons/icon-192.png',
   './icons/icon-512.png',
   './icons/apple-touch-icon.png',
@@ -23,8 +24,9 @@ const SHELL = [
 ];
 
 // 無料で開いている3ポーズ（No.1 / No.6 / No.24）の絵と音声
+// 🔴 BGMは先に取らない。4曲で9.3MBあり、install で取ると初回が重く、
+//    失敗すると SW ごと入らない。**選んで再生したものだけ**キャッシュに落ちる
 const FREE_ASSETS = [
-  './assets/bgm.mp3',
   './assets/img/no01.webp',
   './assets/audio/no01a.mp3',
   './assets/audio/no01b.mp3',
