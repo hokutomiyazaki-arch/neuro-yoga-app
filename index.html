@@ -522,10 +522,9 @@ function aud(){
        素材側も両端を絞ってある）
    🔴 AudioContext が使えない端末がある（ロックダウンモード等・ナレッジ §3-3）。
       そのときは **BGMだけ諦めて、音声ガイドは止めない**。         */
-window.NY.bgm = { ctx:null, bufs:{}, src:null, gain:null, id:'', vol:0.35, loading:false, list:[] };
+window.NY.bgm = { ctx:null, el:null, node:null, gain:null, id:'', vol:0.35, loading:false, list:[] };
 
-/* 曲の一覧。🔴 曲ごとに長さも容量も違う（60秒〜5分／0.5〜3.7MB）ので、
-   **選ばれた1曲だけを読む**。4曲まとめて先に読むと初回が重い */
+/* 曲の一覧。🔴 曲ごとに長さも容量も違うので、**選ばれた1曲だけ**を読む */
 async function bgmList(){
   if(window.NY.bgm.list.length) return window.NY.bgm.list;
   try{
@@ -542,8 +541,7 @@ async function bgmRender(){
   var rows = [{ id:'', label:'流さない', sec:0 }].concat(list);
   rows.forEach(function(t){
     var b = document.createElement('button');
-    var min = t.sec ? Math.floor(t.sec/60) + '分' + String(Math.round(t.sec%60)).padStart(2,'0') + '秒でひと回り' : '';
-    b.innerHTML = '<span class="m">' + t.label + (min ? '<small>' + min + '</small>' : '') + '</span>';
+    b.innerHTML = '<span class="m">' + t.label + '</span>';
     b.className = (t.id === window.NY.bgm.id) ? 'on' : '';
     b.addEventListener('click', function(){ bgmChoose(t.id); });
     box.appendChild(b);
@@ -552,9 +550,8 @@ async function bgmRender(){
 function bgmChoose(id){
   window.NY.bgm.id = id;
   store('ny_bgm', id);
-  bgmStop();
   bgmRender();
-  if(id) bgmStart();
+  if(id) bgmStart(); else bgmStop();
 }
 
 function bgmSetGain(){
@@ -565,14 +562,39 @@ function bgmSetGain(){
   b.gain.gain.setTargetAtTime(b.vol * duck, b.ctx.currentTime, 0.4);
 }
 
+function bgmMsg(cls, txt){
+  $('bgmMsg').className = 'msg' + (cls ? ' ' + cls : '');
+  $('bgmMsg').textContent = txt;
+}
+
+/* ---------- BGM ----------
+   🔴 2026-09-22 実測でこの形に直した。
+
+   最初は decodeAudioData で丸ごと展開していたが、**3〜5分の曲だと
+   67〜106MB を展開し終わるまで1音も鳴らない**（60秒の合成ドローン=21MB では
+   成立していた作りを、そのまま長い曲に当てたのが誤り）。
+   宮崎さん「BGMの読み込みなんでこんな遅いの？？」。
+   ダウンロードは0.2秒で終わっていて、遅いのは**展開**だった。
+
+   → **`<audio>` に流させる**。届いたところから鳴るので待たない。メモリもほぼ食わない。
+     ただし `<audio>` の volume は **iOS Safari が黙って無視する**ので、
+     Web Audio に通して GainNode で音量とダッキングを効かせる
+     （createMediaElementSource は1つの要素に1回しか呼べないので、要素ごと使い回す）。
+   ループの継ぎ目は素材の両端を絞ってあるので、多少の隙間が出ても聞こえない。      */
 async function bgmStart(){
   var b = window.NY.bgm;
-  if(!b.id || b.src || b.loading) return;
+  if(!b.id || b.loading) return;
   var list = await bgmList();
   var t = list.filter(function(x){ return x.id === b.id; })[0];
   if(!t){ b.id = ''; return; }
   b.loading = true;
   try{
+    if(!b.el){
+      b.el = new Audio();
+      b.el.loop = true;
+      b.el.preload = 'auto';
+      b.el.crossOrigin = 'anonymous';
+    }
     if(!b.ctx){
       var AC = window.AudioContext || window.webkitAudioContext;
       if(!AC) throw new Error('no AudioContext');
@@ -580,41 +602,44 @@ async function bgmStart(){
       b.gain = b.ctx.createGain();
       b.gain.gain.value = 0;
       b.gain.connect(b.ctx.destination);
+      b.node = b.ctx.createMediaElementSource(b.el);   // 1回だけ
+      b.node.connect(b.gain);
     }
-    if(b.ctx.state === 'suspended') await b.ctx.resume();   // 触った瞬間に起こす
-    if(!b.bufs[t.id]){
-      $('bgmMsg').className = 'msg';
-      $('bgmMsg').textContent = '読み込んでいます…';
-      var res = await fetch(bgmUrl(t));
-      var ab = await res.arrayBuffer();
-      // 🔴 decodeAudioData は端末によっては**返ってこないことがある**
-      //    （音を出せない環境で実測。エラーも出ずに止まる）。
-      //    待ち続けると「読み込んでいます…」のまま固まるので、切り上げる
-      b.bufs[t.id] = await Promise.race([
-        b.ctx.decodeAudioData(ab),
-        new Promise(function(_, ng){
-          setTimeout(function(){ ng(new Error('decode timeout')); }, 20000);
-        })
-      ]);
+    if(b.ctx.state === 'suspended') await b.ctx.resume();
+    var url = bgmUrl(t);
+    if(b.el.getAttribute('data-id') !== t.id){
+      bgmMsg('', '読み込んでいます…');
+      b.el.setAttribute('data-id', t.id);
+      b.el.src = url;
+      b.el.currentTime = 0;
     }
-    if(b.id !== t.id){ b.loading = false; return; }   // 読んでいる間に別の曲を選ばれた
-    var src = b.ctx.createBufferSource();
-    src.buffer = b.bufs[t.id]; src.loop = true;
-    src.connect(b.gain); src.start(0);
-    b.src = src;
+    b.el.onplaying = function(){
+      if(window.NY.bgm.id === t.id){ bgmMsg('', ''); clearTimeout(b.stall); }
+    };
+    b.el.onerror = function(){ bgmMsg('ng', 'この曲を読み込めませんでした。'); };
+    // 🔴 通信が細いと、読み込みのまま止まったように見える。15秒で言葉にする
+    //    （黙って止まると「壊れた」と読まれる。音声ガイドは止まっていない）
+    clearTimeout(b.stall);
+    b.stall = setTimeout(function(){
+      if(window.NY.bgm.id === t.id && b.el && b.el.currentTime === 0){
+        bgmMsg('ng', 'BGMの読み込みに時間がかかっています。'
+                   + '電波の良いところで開き直すか、「流さない」にしてください。');
+      }
+    }, 15000);
+    await b.el.play();
     bgmSetGain();
-    $('bgmMsg').textContent = '';
   }catch(e){
     b.id = '';
     bgmRender();
-    $('bgmMsg').className = 'msg ng';
-    $('bgmMsg').textContent = 'この端末ではBGMを鳴らせませんでした（音声ガイドはそのまま使えます）。';
+    bgmMsg('ng', 'この端末ではBGMを鳴らせませんでした（音声ガイドはそのまま使えます）。');
   }
   b.loading = false;
 }
 function bgmStop(){
   var b = window.NY.bgm;
-  if(b.src){ try{ b.src.stop(); }catch(e){} try{ b.src.disconnect(); }catch(e){} b.src = null; }
+  if(b.stall) clearTimeout(b.stall);
+  if(b.el){ try{ b.el.pause(); }catch(e){} }
+  bgmMsg('', '');
 }
 
 /* ---------- 画面の描画 ---------- */
