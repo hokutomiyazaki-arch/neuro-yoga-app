@@ -8,7 +8,7 @@
 //    23ポーズぶんの音声は 16MB あり、install で全部取ると初回が重く、失敗すると
 //    SW ごと入らない。**無料の3ポーズ（約2MB）だけ先に取り、残りは再生したときに
 //    キャッシュへ落とす**（runtime cache）。2回目からはオフラインで聴ける。
-const CACHE_NAME = 'neuro-yoga-v1.0.3';   // ★デプロイのたびにここを上げる★
+const CACHE_NAME = 'neuro-yoga-v1.0.4';   // ★デプロイのたびにここを上げる★
 
 const SHELL = [
   './',

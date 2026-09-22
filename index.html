@@ -545,7 +545,16 @@ async function bgmStart(){
       $('bgmMsg').className = 'msg';
       $('bgmMsg').textContent = '読み込んでいます…';
       var res = await fetch(bgmUrl(t));
-      b.bufs[t.id] = await b.ctx.decodeAudioData(await res.arrayBuffer());
+      var ab = await res.arrayBuffer();
+      // 🔴 decodeAudioData は端末によっては**返ってこないことがある**
+      //    （音を出せない環境で実測。エラーも出ずに止まる）。
+      //    待ち続けると「読み込んでいます…」のまま固まるので、切り上げる
+      b.bufs[t.id] = await Promise.race([
+        b.ctx.decodeAudioData(ab),
+        new Promise(function(_, ng){
+          setTimeout(function(){ ng(new Error('decode timeout')); }, 20000);
+        })
+      ]);
     }
     if(b.id !== t.id){ b.loading = false; return; }   // 読んでいる間に別の曲を選ばれた
     var src = b.ctx.createBufferSource();
