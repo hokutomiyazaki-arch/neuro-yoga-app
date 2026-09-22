@@ -202,16 +202,20 @@ main{ padding:16px 14px 40px; max-width:720px; margin:0 auto; }
 #menu p, #menu li{ font-size:13px; font-weight:500; color:var(--text); line-height:1.85; }
 #menu ul{ padding-left:1.1em; margin:6px 0; }
 
-#bgmPick{ display:flex; flex-direction:column; gap:6px; margin:10px 0 10px; }
-#bgmPick button{
-  display:flex; align-items:center; gap:9px; width:100%; text-align:left;
-  background:var(--bg); border:1px solid var(--line); color:var(--text);
-  border-radius:12px; padding:10px 12px; font-size:13.5px;
+.bgmbar{
+  background:var(--card); border:1px solid var(--line); border-radius:14px;
+  padding:11px 12px 12px; margin:0 0 18px;
 }
-#bgmPick button .m{ flex:1; min-width:0; }
-#bgmPick button .m small{ display:block; font-size:11px; color:var(--muted); font-weight:500; }
-#bgmPick button.on{ border-color:var(--gold); background:#1d2752; }
-#bgmPick button.on::after{ content:"♪"; color:var(--gold); }
+.bgmhead{ font-size:12px; color:var(--gold); letter-spacing:.06em; }
+.bgmhead span{ color:var(--muted); font-weight:500; letter-spacing:0; margin-left:8px; font-size:11px; }
+#bgmPick{ display:flex; flex-wrap:wrap; gap:6px; margin:9px 0 10px; }
+#bgmPick button{
+  background:var(--bg); border:1px solid var(--line); color:var(--text);
+  border-radius:999px; padding:7px 13px; font-size:12.5px; line-height:1.4;
+}
+#bgmPick button small{ display:none; }          /* 横並びなので長さは出さない */
+#bgmPick button.on{ border-color:var(--gold); background:var(--gold); color:#11162e; }
+#bgmMsg:empty{ display:none; }
 .vol{ display:flex; align-items:center; gap:9px; font-size:11px; color:var(--muted); }
 .vol input{ flex:1; accent-color:var(--gold); }
 
@@ -273,6 +277,15 @@ footer .fnt{ display:block; margin-top:4px; opacity:.75; }
     <button id="flowStart" class="primary">通しでやる<small id="flowLen"></small></button>
     <label class="opt"><input type="checkbox" id="optWhy" checked> ③ 狙いの解説も流す</label>
   </div>
+  <div class="bgmbar">
+    <div class="bgmhead">BGM<span>声が出たら自動で下がります</span></div>
+    <div id="bgmPick"></div>
+    <div class="vol"><span>小</span>
+      <input type="range" id="bgmVol" min="0" max="100" value="35" aria-label="BGMの音量">
+      <span>大</span></div>
+    <div id="bgmMsg" class="msg"></div>
+  </div>
+
   <div id="list"></div>
   <p class="sect" id="lockedHead" hidden>解除コードで開くポーズ</p>
   <div id="lockedList"></div>
@@ -344,15 +357,6 @@ footer .fnt{ display:block; margin-top:4px; opacity:.75; }
     <button id="apply">開く</button>
   </div>
   <div class="msg" id="codeMsg"></div>
-
-  <h3>BGM</h3>
-  <p>ヨガの定番のドローン（主音と5度だけを重ねた音）を用意しました。
-    明るい/暗いの色が付かないので、どのポーズにも当たりません。</p>
-  <div id="bgmPick"></div>
-  <div class="vol"><span>小</span>
-    <input type="range" id="bgmVol" min="0" max="100" value="35" aria-label="BGMの音量">
-    <span>大</span></div>
-  <p id="bgmMsg" class="msg"></p>
 
   <h3>ホーム画面に置く</h3>
   <p>iPhone は Safari の共有ボタン <b>［  ］</b> →「ホーム画面に追加」。<br>
