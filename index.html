@@ -354,37 +354,50 @@ function store(k, v){
    🔴 公開リポジトリなので、画面で隠すだけでは意味がない。
       鍵つきポーズの「ファイル名と台本」は data.js の中で封じてある。
       コードを入れて初めて、どのファイルを読めばいいかが分かる。
+
+   🔴 2026-09-22 の直し（セキュリティ検査で出た2件。どちらも私が入れた弱点）
+     ・**コードの正解判定に SHA-256 を1回使っていた。** それだと PBKDF2 を
+       60万回まわして重くした意味が消える（総当たりが一気に安くなる）。
+       → **やめた。** ほどいてみて、頭に目印（NYAPPv1:）があるかで見る。
+         1回試すのに PBKDF2 のコストがかかる形にした
+     ・**キーストリームが鍵だけから決まっていた。** 作り直すたびに同じ列が出るので、
+       2つの暗号文をXORすると中身が出る。→ **nonce を混ぜる**
+
    🔴 crypto.subtle は https でしか動かない（GitHub Pages はhttps）。
       手元で確かめるときは file:// ではなくローカルサーバーで開く。          */
-async function sha256hex(bytes){
-  var d = await crypto.subtle.digest('SHA-256', bytes);
-  return Array.from(new Uint8Array(d)).map(function(b){
-    return b.toString(16).padStart(2,'0'); }).join('');
+var MAGIC = 'NYAPPv1:';
+
+function b64bytes(b64){
+  var bin = atob(b64), a = new Uint8Array(bin.length);
+  for(var i=0;i<bin.length;i++) a[i] = bin.charCodeAt(i);
+  return a;
 }
-async function keystream(key, n){
+async function keystream(key, nonce, n){
   var out = new Uint8Array(Math.ceil(n/32)*32);
   for(var i=0; i*32 < n; i++){
-    var buf = new Uint8Array(key.length + 4);
+    var buf = new Uint8Array(key.length + nonce.length + 4);
     buf.set(key, 0);
-    new DataView(buf.buffer).setUint32(key.length, i, false);
+    buf.set(nonce, key.length);
+    new DataView(buf.buffer).setUint32(key.length + nonce.length, i, false);
     out.set(new Uint8Array(await crypto.subtle.digest('SHA-256', buf)), i*32);
   }
   return out.subarray(0, n);
 }
 async function openSealed(code){
   var enc = new TextEncoder();
-  if((await sha256hex(enc.encode(code))).slice(0,16) !== D.codeHash) return null;
   var km = await crypto.subtle.importKey('raw', enc.encode(code), 'PBKDF2', false, ['deriveBits']);
   var bits = await crypto.subtle.deriveBits(
     { name:'PBKDF2', salt: enc.encode(D.salt), iterations: D.iter, hash:'SHA-256' }, km, 256);
   var key = new Uint8Array(bits);
-  var bin = atob(D.sealed);
-  var ct = new Uint8Array(bin.length);
-  for(var i=0;i<bin.length;i++) ct[i] = bin.charCodeAt(i);
-  var ks = await keystream(key, ct.length);
+  var nonce = b64bytes(D.nonce);
+  var ct = b64bytes(D.sealed);
+  var ks = await keystream(key, nonce, ct.length);
   var raw = new Uint8Array(ct.length);
   for(var j=0;j<ct.length;j++) raw[j] = ct[j] ^ ks[j];
-  try{ return JSON.parse(new TextDecoder().decode(raw)); }catch(e){ return null; }
+  var txt;
+  try{ txt = new TextDecoder().decode(raw); }catch(e){ return null; }
+  if(txt.slice(0, MAGIC.length) !== MAGIC) return null;   // 合言葉が出なければ違うコード
+  try{ return JSON.parse(txt.slice(MAGIC.length)); }catch(e){ return null; }
 }
 
 /* ---------- 音（Audio要素は1つだけ・ナレッジ §3-6） ---------- */
@@ -583,7 +596,8 @@ async function applyCode(){
     msg.textContent = 'この開き方ではコードを確認できません。アプリのURL（https）から開いてください。';
     return;
   }
-  msg.className = 'msg'; msg.textContent = '確かめています…';
+  msg.className = 'msg'; msg.textContent = '確かめています…（少しかかります）';
+  await new Promise(function(r){ setTimeout(r, 30); });
   var got = null;
   try{ got = await openSealed(code); }catch(e){ got = null; }
   if(!got){ msg.className = 'msg ng'; msg.textContent = 'このコードでは開きませんでした。'; return; }
