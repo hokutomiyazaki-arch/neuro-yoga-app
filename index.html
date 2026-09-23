@@ -150,6 +150,16 @@ main{ padding:16px 14px 40px; max-width:720px; margin:0 auto; }
 .fig img{ border-radius:14px; background:#fff; width:100%; }
 .fig figcaption{ font-size:11px; color:var(--muted); margin-top:5px; text-align:center; }
 
+/* 狙う神経の図。LPで「どこを狙っているのかは、言葉より図の方が早い」と
+   言っている中核なので、ポーズの絵のすぐ下に置く */
+.neuro{
+  margin:14px 0 0; padding:12px; background:#fff; border-radius:14px;
+  display:flex; align-items:center; gap:12px;
+}
+.neuro img{ width:104px; height:104px; flex:0 0 104px; object-fit:contain; }
+.neuro figcaption{ font-size:12px; color:#5b6076; font-weight:500; }
+.neuro figcaption b{ display:block; font-size:15px; color:#11162e; margin-top:3px; }
+
 .tracks{ margin:16px 0 0; display:flex; flex-direction:column; gap:8px; }
 .trk{
   display:flex; align-items:center; gap:11px; width:100%; text-align:left;
@@ -323,6 +333,11 @@ footer .fnt{ display:block; margin-top:4px; opacity:.75; }
       <button id="fNext">次 →</button>
     </div>
     <div class="figs" id="pFigs"></div>
+    <figure class="neuro" id="pNeuro" hidden>
+      <img id="pNeuroImg" alt="">
+      <figcaption>狙う神経　<b id="pNeuroLabel"></b></figcaption>
+    </figure>
+
     <div class="tracks" id="pTracks"></div>
 
     <div class="gap" id="gap" hidden></div>
@@ -716,6 +731,14 @@ function openPose(p, keepFlow){
     return '<figure class="fig"><img src="assets/img/' + i.f + '" alt="">' +
            (i.cap ? '<figcaption>' + i.cap + '</figcaption>' : '') + '</figure>';
   }).join('');
+
+  if(p.neuro){
+    $('pNeuroImg').src = 'assets/img/' + p.neuro.f;
+    $('pNeuroLabel').textContent = p.neuro.label;
+    $('pNeuro').hidden = false;
+  }else{
+    $('pNeuro').hidden = true;     // No.30 / No.32 は CPG で図に描けない
+  }
 
   $('pTracks').innerHTML = p.tracks.map(function(t, i){
     var cls = t.who.indexOf('ケン') === 0 ? 'who-ken' : 'who-hok';
