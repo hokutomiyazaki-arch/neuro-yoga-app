@@ -167,6 +167,15 @@ main{ padding:16px 14px 40px; max-width:720px; margin:0 auto; }
 .trk .who-ken{ color:var(--ken); }
 .trk .who-hok{ color:var(--hok); }
 
+/* 🔴 iOSは「触った瞬間」以外に音を鳴らせないことがある。
+   ①→②→③ や次のポーズへは**こちらが勝手に**鳴らしにいくので、止められうる。
+   止まったまま黙っていると「壊れた」と読まれるので、**押せば続くボタン**を出す。
+   押した瞬間はユーザー操作なので、iOSも通す。 */
+.resume{
+  display:block; width:100%; margin-top:12px; border:none; border-radius:14px;
+  padding:15px 10px; font-size:15px; background:var(--gold); color:#11162e;
+}
+
 .gap{
   margin-top:12px; text-align:center; font-size:13px; color:var(--gold);
   background:var(--bg2); border:1px dashed var(--line); border-radius:12px; padding:9px;
@@ -317,6 +326,7 @@ footer .fnt{ display:block; margin-top:4px; opacity:.75; }
     <div class="tracks" id="pTracks"></div>
 
     <div class="gap" id="gap" hidden></div>
+    <button class="resume" id="resume" hidden></button>
 
     <div class="seek">
       <input type="range" id="seek" min="0" max="1000" value="0" step="1" aria-label="再生位置">
@@ -738,7 +748,7 @@ function closePose(){
 
 /* ---------- 再生 ---------- */
 function play(i, chain){
-  cancelWait();
+  cancelWait(); hideResume();
   var p = window.NY.cur; if(!p || !p.tracks[i]) return;
   var a = aud(); if(!a) return;
   window.NY.track = i;
@@ -748,7 +758,8 @@ function play(i, chain){
   a.currentTime = 0;
   var pr = a.play();
   if(pr && pr.catch) pr.catch(function(){
-    warn('音声が始まりませんでした。もう一度ボタンを押してください。');
+    // 🔴 自動で鳴らしにいって止められた。黙って終わらせず、押せば続く形にする
+    showResume(i, chain, p.tracks[i].label);
   });
   wake(true);
   markTracks();
@@ -800,7 +811,7 @@ function nextPose(waitMs){
   var go = function(){
     if(!window.NY.flow) return;      // 待っているあいだに「やめる」を押されていたら進めない
     openPose(list[window.NY.fi]);
-    play(0, true);
+    play(0, true);                   // 鳴らせなければ play() の中でボタンが出る
   };
   if(waitMs) after(waitMs / 1000, 'No.' + list[window.NY.fi].no, go); else go();
 }
@@ -816,7 +827,7 @@ function paintFlow(){
   if(on) $('fPos').textContent = (window.NY.fi + 1) + ' / ' + window.NY.poses.length + ' ポーズ';
 }
 function stop(){
-  cancelWait();
+  cancelWait(); hideResume();
   var a = window.NY.audio;
   if(a){ try{ a.pause(); a.currentTime = 0; }catch(e){} }
   window.NY.track = -1; window.NY.chain = false;
@@ -824,6 +835,17 @@ function stop(){
   markTracks(); paint(); bgmSetGain();
   $('pause').textContent = '一時停止';
 }
+function showResume(i, chain, label){
+  var b = $('resume');
+  b.hidden = false;
+  b.textContent = '▶ ' + label.replace(/^[①②③]\s*/, '') + ' を再生';
+  b.onclick = function(){
+    b.hidden = true;
+    play(i, chain);          // ここはユーザー操作の中なので iOS も通す
+  };
+}
+function hideResume(){ var b = $('resume'); if(b) b.hidden = true; }
+
 function markTracks(){
   Array.prototype.forEach.call($('pTracks').children, function(b){
     b.classList.toggle('on', +b.dataset.i === window.NY.track);
